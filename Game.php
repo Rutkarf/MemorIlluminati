@@ -9,13 +9,21 @@ class Game {
     }
 
     private function generateCards() {
+        $this->cards = [];
+    
+        // Crée une liste d'images avec le chemin correct
         for ($i = 1; $i <= $this->numberOfPairs; $i++) {
-            $image = "images/card{$i}.jpg"; // Assurez-vous d'avoir des images de cartes correspondantes
+            $image = "./assets/card/Card{$i}.jpg"; // Assurez-vous que ce chemin est correct
+            
+            // Crée deux instances de Card pour chaque image (une paire)
             $this->cards[] = new Card($i, $image);
             $this->cards[] = new Card($i, $image);
         }
+    
+        // Mélange les cartes pour un placement aléatoire
         shuffle($this->cards);
     }
+    
 
     public function getCards() {
         return $this->cards;
