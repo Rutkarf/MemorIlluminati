@@ -1,51 +1,69 @@
 <!-- MemoryGame\index.php -->
-
-
 <?php
-// Charger toutes les classes nécessaires avant tout accès à la session
 require_once 'Card.php';
 require_once 'Game.php';
 require_once 'Player.php';
 require_once 'Leaderboard.php';
 
-// Démarrer la session
 session_start();
 
-// Récupérer ou initialiser le leaderboard
+// Vérifier si le bouton "reset" a été cliqué pour réinitialiser la partie
+if (isset($_POST['reset'])) {
+    unset($_SESSION['game']);
+    unset($_SESSION['player']);
+    unset($_SESSION['startTime']);
+    unset($_SESSION['attempts']);
+    unset($_SESSION['flippedCards']);
+    unset($_SESSION['toHide']);
+    header("Location: index.php");
+    exit;
+}
+
+// Récupérer ou initialiser le leaderboard depuis la session
 $leaderboard = $_SESSION['leaderboard'] ?? new Leaderboard();
 
-// Initialisation du jeu
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Initialisation du jeu si le formulaire a été soumis (sauf si c'est un reset)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['reset'])) {
     $playerName = $_POST['name'] ?? 'Anonyme';
-    $numberOfPairs = (int)$_POST['pairs'];
+    $numberOfPairs = isset($_POST['pairs']) ? (int)$_POST['pairs'] : 3;
 
     $player = new Player($playerName);
     $game = new Game($numberOfPairs);
 
     $_SESSION['player'] = $player;
     $_SESSION['game'] = $game;
-    $_SESSION['startTime'] = microtime(true); // Enregistre le temps de début
-    $_SESSION['attempts'] = 0; // Initialise le nombre de tentatives
-    $_SESSION['flippedCards'] = []; // Pour garder une trace des cartes retournées
-    $_SESSION['lastFlippedCards'] = []; // Pour stocker temporairement les cartes retournées
+    $_SESSION['startTime'] = microtime(true);
+    $_SESSION['attempts'] = 0;
+    $_SESSION['flippedCards'] = [];
+    $_SESSION['toHide'] = [];
 }
 
-// Accéder aux objets de la session après s'assurer que les classes sont chargées
+// Récupérer les objets jeu et joueur depuis la session
 $game = $_SESSION['game'] ?? null;
 $player = $_SESSION['player'] ?? null;
 
+// Vérifiez et initialisez 'flippedCards' comme tableau s'il n'existe pas encore
+if (!isset($_SESSION['flippedCards']) || !is_array($_SESSION['flippedCards'])) {
+    $_SESSION['flippedCards'] = [];
+}
+
+// Vérifiez et initialisez 'toHide' comme tableau s'il n'existe pas encore
+if (!isset($_SESSION['toHide']) || !is_array($_SESSION['toHide'])) {
+    $_SESSION['toHide'] = [];
+}
+
+// Vérifier pour retourner une carte si le jeu est en cours et si une carte est sélectionnée
 if ($game && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['flip'])) {
     $index = (int)$_GET['flip'];
     $cards = $game->getCards();
 
-    // Si la carte a déjà été retournée, ignorez l'action
-    if (in_array($index, $_SESSION['flippedCards'])) {
+    if (in_array($index, $_SESSION['flippedCards']) || in_array($index, $_SESSION['toHide'])) {
         header("Location: index.php");
         exit;
     }
 
-    // Ajoute l'index de la carte retournée
     $_SESSION['flippedCards'][] = $index;
+
     $_SESSION['attempts']++;
 
     if (count($_SESSION['flippedCards']) === 2) {
@@ -53,43 +71,41 @@ if ($game && $_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['flip'])) {
         $secondCard = $cards[$_SESSION['flippedCards'][1]];
 
         if ($game->checkMatch($firstCard, $secondCard)) {
-            // Si c'est une correspondance, vide la liste des cartes retournées
-            $_SESSION['flippedCards'] = [];
+            $_SESSION['toHide'] = $_SESSION['flippedCards'];
         } else {
-            // Si ce n'est pas une correspondance, affichez les cartes pendant 1 seconde
-            $_SESSION['lastFlippedCards'] = $_SESSION['flippedCards'];
-            $_SESSION['flippedCards'] = [];
-
-            header("Refresh: 1; url=index.php");
-            exit;
+            // Si les cartes ne correspondent pas, les retourner après un délai
+            $_SESSION['toHide'] = [];
         }
+        $_SESSION['flippedCards'] = [];
+    }
+
+    // Cacher les cartes après un court délai si elles ne correspondent pas
+    if (count($_SESSION['toHide']) === 2) {
+        // Définir un délai pour cacher les cartes
+        sleep(1); // Utiliser sleep() peut ne pas être la meilleure approche pour les applications web en production
+        $_SESSION['toHide'] = [];
     }
 
     // Vérifier si le jeu est terminé
-    if ($game->isGameOver()) {
-        $endTime = microtime(true);
-        $timeElapsed = $endTime - $_SESSION['startTime'];
-        $score = max(1000 - ($timeElapsed * 10) - ($_SESSION['attempts'] * 5), 0);
-
-        $leaderboard->updateLeaderboard($player, $score);
+    if ($game->isCompleted()) {
+        // Ajouter le score au leaderboard
+        $elapsedTime = microtime(true) - $_SESSION['startTime'];
+        $score = max(0, 1000 - (int)($_SESSION['attempts'] * 10 + $elapsedTime / 60));
+        $leaderboard->addEntry($player->getName(), $score);
         $_SESSION['leaderboard'] = $leaderboard;
 
-        echo "<p>Félicitations, {$player->getName()} ! Vous avez terminé le jeu.</p>";
-        echo "<p>Votre score : $score</p>";
-        echo "<a href='index.php'>Rejouer</a>";
-
-        session_destroy();
-        exit;
+        // Réinitialiser la session du jeu
+        unset($_SESSION['game']);
+        unset($_SESSION['player']);
+        unset($_SESSION['startTime']);
+        unset($_SESSION['attempts']);
+        unset($_SESSION['flippedCards']);
+        unset($_SESSION['toHide']);
     }
-}
 
-// Réinitialiser l'état des dernières cartes retournées
-if ($game && isset($_SESSION['lastFlippedCards'])) {
-    $_SESSION['lastFlippedCards'] = [];
+    header("Location: index.php");
+    exit;
 }
-
-// Récupère les cartes à afficher
-$cards = $game ? $game->getCards() : [];
 ?>
 
 <!DOCTYPE html>
@@ -98,106 +114,72 @@ $cards = $game ? $game->getCards() : [];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memor'Illuminati</title>
-    <!-- Bootstrap CSS -->
-    <link href="assets/css/bootstrap.css" rel="stylesheet">
+    <title>Jeu de Mémoire</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
 <body>
-
-    <nav class="navbar">
-        <div class="container-fluid">
-            <!-- Nom du jeu à gauche -->
-            <a class="navbar-brand" href="#">Memor'Illuminati</a>
-
-            <!-- Bouton pour mobile -->
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <!-- Contenu de la navbar -->
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mx-auto">
-                    <!-- Réseaux sociaux au centre -->
-                    <li class="nav-item">
-                        <a class="nav-link" href="https://www.facebook.com" target="_blank">
-                            <i class="fab fa-facebook"></i> Facebook
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="https://www.twitter.com" target="_blank">
-                            <i class="fab fa-twitter"></i> Twitter
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="https://www.instagram.com" target="_blank">
-                            <i class="fab fa-instagram"></i> Instagram
-                        </a>
-                    </li>
-                </ul>
-
-                <!-- Leaderboard à droite -->
-                <ul class="navbar-nav ml-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#leaderboard">Leaderboard</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
     <div class="container">
-        <h1 class="mt-5">Jeu de Memory</h1>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <a class="navbar-brand" href="#">Jeu de Mémoire</a>
+        </nav>
 
         <?php if (!$game): ?>
-            <form method="post" action="index.php" class="mt-4">
+            <form method="post" class="mt-4">
                 <div class="form-group">
-                    <label for="name">Nom du joueur :</label>
+                    <label for="name">Nom :</label>
                     <input type="text" id="name" name="name" class="form-control" required>
                 </div>
                 <div class="form-group">
                     <label for="pairs">Nombre de paires :</label>
-                    <input type="number" id="pairs" name="pairs" class="form-control" min="3" max="12" required>
+                    <input type="number" id="pairs" name="pairs" class="form-control" min="2" max="10" value="3" required>
                 </div>
-                <button type="submit" class="btn btn-primary mt-3">Démarrer le jeu</button>
+                <button type="submit" class="btn btn-primary">Démarrer le jeu</button>
             </form>
         <?php else: ?>
-            <div class="board mt-4 d-flex flex-wrap">
-                <?php foreach ($cards as $index => $card): ?>
+            <div class="board mt-4">
+                <?php foreach ($game->getCards() as $index => $card): ?>
                     <?php
-                    $flipped = in_array($index, $_SESSION['flippedCards']) || in_array($index, $_SESSION['lastFlippedCards']);
+                    $isFlipped = in_array($index, $_SESSION['flippedCards']) || in_array($index, $_SESSION['toHide']);
                     ?>
-                    <div class="card m-2" style="width: 100px; height: 150px;">
-                        <?php if ($card->isMatched() || $flipped): ?>
-                            <img src="<?= $card->getImage() ?>" alt="Card" class="img-fluid">
-                        <?php else: ?>
-                            <a href="index.php?flip=<?= $index ?>">
-                                <img src="assets/card/BackCard.jpg" alt="Hidden Card" class="img-fluid">
-                            </a>
-                        <?php endif; ?>
+                    <div class="card-container">
+                        <div class="card <?php echo $isFlipped ? 'flipped' : ''; ?>" onclick="flipCard(<?php echo $index; ?>)">
+                            <div class="front">
+                                <!-- Face avant de la carte avec l'image du dos -->
+                            </div>
+                            <div class="back">
+                                <img src="<?php echo htmlspecialchars($card->getImage()); ?>" alt="Carte">
+                            </div>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
-            <p class="mt-3">Tentatives : <?= $_SESSION['attempts'] ?></p>
         <?php endif; ?>
 
-        <h2 class="mt-5">Classement</h2>
-        <ul>
-            <?php
-            $topPlayers = $leaderboard->getTopPlayers();
-            foreach ($topPlayers as $topPlayer) {
-                echo "<li>{$topPlayer->getName()} - Meilleur score : " . $topPlayer->getScores()[0] . "</li>";
-            }
-            ?>
-        </ul>
+        <form method="post" class="mt-4">
+            <button type="submit" name="reset" class="btn btn-danger">Réinitialiser</button>
+        </form>
+
+        <div id="leaderboard" class="mt-5">
+            <h2>Leaderboard</h2>
+            <ul>
+                <?php foreach ($leaderboard->getEntries() as $entry): ?>
+                    <li><?php echo htmlspecialchars($entry['name']); ?> : <?php echo htmlspecialchars($entry['score']); ?> points</li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
     </div>
 
-    <!-- Bootstrap JS and dependencies -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.3.3/js/bootstrap.min.js"></script>
+    <script>
+        function flipCard(index) {
+            window.location.href = `index.php?flip=${index}`;
+        }
+    </script>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/js/all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
 </body>
 
 </html>

@@ -1,13 +1,16 @@
+<!-- MemoryGame\Card.php -->
+
+
 <?php
+
 class Card {
     private $id;
     private $image;
-    private $isMatched;
+    private $matched = false;
 
     public function __construct($id, $image) {
         $this->id = $id;
         $this->image = $image;
-        $this->isMatched = false;
     }
 
     public function getId() {
@@ -18,16 +21,12 @@ class Card {
         return $this->image;
     }
 
-    public function isMatched() {
-        return $this->isMatched;
-    }
-
     public function match() {
-        $this->isMatched = true;
+        $this->matched = true;
     }
 
-    public function unmatch() {
-        $this->isMatched = false;
+    public function isMatched() {
+        return $this->matched;
     }
 }
 ?>

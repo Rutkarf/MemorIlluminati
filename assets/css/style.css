@@ -1,84 +1,133 @@
-/* styles.css */
+/* Général */
+/* assets/css/style.css */
+
+/* Général */
+body {
+  background: #0d0d0d;
+  color: #e0e0e0;
+  font-family: "Roboto", sans-serif;
+}
+
+/* Navbar */
+.navbar {
+  background: #1c1c1c;
+  border-bottom: 2px solid #e60073;
+}
+
+.navbar-brand {
+  color: #e60073;
+  font-size: 1.5rem;
+}
+
+.navbar-nav .nav-link {
+  color: #e0e0e0;
+  transition: color 0.3s;
+}
+
+.navbar-nav .nav-link:hover {
+  color: #e60073;
+}
+
+/* Titres */
+h1,
+h2 {
+  color: #e60073;
+}
+
+/* Formulaire */
+.form-group label {
+  color: #e0e0e0;
+}
+
+.form-control {
+  background: #333;
+  border: 1px solid #444;
+  color: #e0e0e0;
+}
+
+.form-control:focus {
+  border-color: #e60073;
+  background-color: #222;
+  color: #e0e0e0;
+}
+
+/* Boutons */
+.btn-primary {
+  background-color: #e60073;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #ff007a;
+}
+
+/* Cartes */
+.board {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* Centrer les cartes horizontalement */
+}
 
 /* assets/css/style.css */
 
-body.cyberpunk-theme {
-  background-color: #1a1a2e;
-  color: #e0e0e0;
-  font-family: "Orbitron", sans-serif;
-}
-
-.navbar {
-  border-bottom: 2px solid #0ff;
-}
-
-.text-neon {
-  color: #0ff;
-  text-shadow: 0 0 5px #00f0ff, 0 0 10px #00f0ff, 0 0 15px #00f0ff;
-}
-
-.neon-input {
-  background-color: transparent;
-  border: 1px solid #0ff;
-  color: #0ff;
-  text-shadow: 0 0 5px #00f0ff, 0 0 10px #00f0ff, 0 0 15px #00f0ff;
-  padding: 10px;
-}
-
-.neon-input::placeholder {
-  color: #0ff;
-}
-
-.btn-neon {
-  background-color: #0ff;
-  border: none;
-  color: #1a1a2e;
-  padding: 10px 20px;
-  text-shadow: none;
-  transition: all 0.3s ease-in-out;
-}
-
-.btn-neon:hover {
-  background-color: #00e0ff;
-  color: #ffffff;
-}
-
-.board {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 15px;
-  margin-top: 20px;
+/* Style des conteneurs de cartes */
+.card-container {
+  perspective: 1000px; /* Crée une perspective pour l'animation de flip */
 }
 
 .card {
-  background-color: #0ff;
-  padding: 10px;
-  border-radius: 10px;
-  box-shadow: 0 0 10px #00f0ff;
-  transition: transform 0.3s ease;
+  width: 100px; /* Fixer une largeur pour chaque carte */
+  height: 150px; /* Fixer une hauteur pour chaque carte */
+  position: relative;
+  transform-style: preserve-3d; /* Assure que les éléments enfants sont transformés en 3D */
+  transition: transform 0.6s; /* Animation pour le flip */
+  cursor: pointer; /* Change le curseur pour indiquer que la carte est cliquable */
 }
 
-.card:hover {
-  transform: scale(1.1);
+.card.flipped {
+  transform: rotateY(180deg); /* Rotation de 180 degrés pour l'animation de flip */
 }
 
-.card img {
-  max-width: 100%;
-  border-radius: 5px;
+/* Face avant de la carte */
+.card .front,
+.card .back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden; /* Cache la face arrière lorsqu'elle est retournée */
 }
 
-.matched {
-  border: 2px solid #00ff99;
+.card .front {
+  background: url('./assets/card/backCard.jpg') no-repeat center center; /* Image du dos de la carte */
+  background-size: cover; /* Ajuste l'image pour couvrir toute la face */
 }
 
-.flipped {
-  border: 2px solid #ff0099;
+.card .back {
+  background: no-repeat center center; /* Pas d'image de fond par défaut */
+  background-size: cover; /* Ajuste l'image pour couvrir toute la face */
+  transform: rotateY(180deg); /* Rotation pour que la face arrière soit cachée lorsque la carte est retournée */
 }
 
-.list-group-item {
-  background-color: transparent;
-  border: 1px solid #0ff;
-  color: #0ff;
-  text-shadow: 0 0 5px #00f0ff, 0 0 10px #00f0ff, 0 0 15px #00f0ff;
-  margin-bottom: 5px;
+@media (max-width: 1200px) {
+  .card {
+    width: calc(100% / 6 - 10px); /* Ajuster pour les écrans moyens */
+  }
+}
+
+@media (max-width: 992px) {
+  .card {
+    width: calc(100% / 5 - 10px); /* Ajuster pour les écrans plus petits */
+  }
+}
+
+@media (max-width: 768px) {
+  .card {
+    width: calc(100% / 4 - 10px); /* Ajuster pour les petits écrans */
+  }
+}
+
+@media (max-width: 576px) {
+  .card {
+    width: calc(100% / 3 - 10px); /* Ajuster pour les très petits écrans */
+  }
 }
